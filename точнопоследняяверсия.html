@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pool Game</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+</head>
+<body>
+  <script>
+    let balls = [];
+    let cueBall;
+    let ballRadius = 20;
+    let holeRadius = ballRadius * 1.50;
+    let friction = 0.988; // Коэффициент трения
+    let cue; // Кий
+    let isAiming = false; // Флаг прицеливания
+    let cuePower = 0;
+    let cueBallStartPosition; // Начальная позиция белого шара
+    let pockets = []; // Координаты луз
+    let p = document.createElement("p"); // элемент для отображения мощности кия
+    let frictionSlider; // Ползунок для регулировки коэффициента трения
+    let frictionValueDisplay; // Элемент для отображения значения коэффициента трения
+
+    function setup() {
+      createCanvas(800, 400);
+
+      p.innerHTML = "Мощность кия "+ cuePower.toFixed(1);
+      document.body.appendChild(p);
+
+      // Создаем ползунок для регулировки коэффициента трения
+      frictionSlider = createSlider(0.799, 0.999, 0.98, 0.001);;
+      frictionSlider.position(5, 465);
+      frictionSlider.style('width', '200px');
+
+      // Элемент для отображения значения коэффициента трения
+      frictionValueDisplay = document.createElement("p");
+      frictionValueDisplay.innerHTML = "Коэффициент трения: " + friction;
+      document.body.appendChild(frictionValueDisplay);
+
+      // Устанавливаем начальные позиции шаров
+      let triangleStartX = 500; // Начальная X-координата треугольника
+      let triangleStartY = height / 2; // Центр по Y
+      let rowSpacing = ballRadius * sqrt(3); // Расстояние между рядами
+
+      // Желтые игровые шары
+      for (let row = 0; row < 5; row++) {
+        for (let col = 0; col <= row; col++) {
+          let x = triangleStartX + row * rowSpacing;
+          let y = triangleStartY - row * ballRadius + col * ballRadius * 2;
+          let ball = new Ball(x, y, ballRadius, 'yellow');
+          balls.push(ball);
+        }
+      }
+
+      // Создаем биток (cue ball)
+      cueBallStartPosition = createVector(200, height / 2);
+      cueBall = new Ball(cueBallStartPosition.x, cueBallStartPosition.y, ballRadius, 'white', true);
+      balls.push(cueBall);
+
+      // Создаем кий
+      cue = new Cue();
+
+      // Добавляем координаты луз
+      addPockets();
+    }
+
+    function draw() {
+      background(34, 139, 34); // Зеленый фон для стола
+
+      // Обновляем коэффициент трения на основе положения ползунка
+      friction = frictionSlider.value();
+      frictionValueDisplay.innerHTML = "Коэффициент трения: " + friction.toFixed(2);
+
+      // Отрисовываем бортики
+      drawBorders();
+      drawInnerBorders();
+
+      // Отрисовываем лузы
+      drawPockets();
+
+      // Обновляем и отображаем шары
+      for (let i = balls.length - 1; i >= 0; i--) {
+        let ball = balls[i];
+        ball.update();
+        ball.display();
+
+        // Проверка падения в лузы
+        if (isBallInPocket(ball)) {
+          if (ball.isCueBall) {
+            ball.resetPosition(); // Возвращаем белый шар в начальную позицию
+          } else {
+            balls.splice(i, 1); // Удаляем шар
+          }
+        }
+      }
+
+      // Обработка столкновений между шарами
+      handleCollisions();
+
+      // Отображение кия, если игрок прицеливается
+      if (isAiming) {
+        cue.display(cueBall);
+      }
+    }
+
+    // Добавление луз
+    function addPockets() {
+      pockets = [
+        createVector(25, 25), // Верхняя левая
+        createVector(width / 2, 25), // Верхняя центральная
+        createVector(width - 25, 25), // Верхняя правая
+        createVector(25, height - 25), // Нижняя левая
+        createVector(width / 2, height - 25), // Нижняя центральная
+        createVector(width - 25, height - 25) // Нижняя правая
+      ];
+    }
+
+    // Отрисовка бортиков
+    function drawBorders() {
+      noStroke();
+      fill(139, 69, 19); // Цвет дерева
+
+      // Верхний бортик
+      rect(0, 0,  width, 25);
+      // Нижний бортик
+      rect(0, height - 25, width, 25);
+      // Левый бортик
+      rect(0, 25, 25, height - 50);
+      // Правый бортик
+      rect(width - 25, 25, 25, height - 50);
+    }
+
+    // Отрисовка внутренних бортиков
+    function drawInnerBorders() {
+      noStroke();
+      fill(85, 107, 47); // Светло-зеленый цвет
+
+      // Верхний бортик
+      rect(25, 25, width - 50, 10);
+      // Нижний бортик
+      rect(25, height - 35, width - 50, 10);
+      // Левый бортик
+      rect(25, 35, 10, height - 70);
+      // Правый бортик
+      rect(width - 35, 35, 10, height - 70);
+    }
+
+    // Отрисовка луз (круглые лузы)
+    function drawPockets() {
+      fill(0); // Цвет луз
+
+      // Угловые лузы (круги)
+      ellipse(28, 28, holeRadius * 2, holeRadius * 2); // Верхняя левая
+      ellipse(width - 28, 28, holeRadius * 2, holeRadius * 2); // Верхняя правая
+      ellipse(28, height - 28, holeRadius * 2, holeRadius * 2); // Нижняя левая
+      ellipse(width - 28, height - 28, holeRadius * 2, holeRadius * 2); // Нижняя правая
+
+      // Центральные лузы (круги)
+      ellipse(width / 2, 20, holeRadius * 2, holeRadius * 2); // Верхняя центральная
+      ellipse(width / 2, height - 20, holeRadius * 2, holeRadius * 2); // Нижняя центральная
+    }
+
+    // Проверка попадания шара в лузу
+    function isBallInPocket(ball) {
+      for (let pocket of pockets) {
+        let d = dist(ball.x, ball.y, pocket.x, pocket.y); // Расстояние от центра шара до центра лузы
+        if (d < holeRadius/1.1 + ball.r/2) { // Если расстояние до края лузы меньше суммы радиуса шара и лузы
+          return true;
+        }
+      }
+      return false;
+    }
+
+    // Обработка начала прицеливания
+    function mousePressed() {
+      if (cueBall.isMouseOver()) {
+        isAiming = true;
+        cuePower = 0;
+      }
+    }
+
+    // Обновление силы кия при движении мыши
+    function mouseDragged() {
+      if (isAiming) {
+        cuePower = dist(mouseX, mouseY, cueBall.x, cueBall.y) / 5; // Мощность удара
+        p.innerHTML = "Мощность кия " + cuePower.toFixed(1); // Возвращаем мощность в элемент <p> с 2 знаками после запятой
+        document.body.appendChild(p);
+      }
+    }
+
+    // Удар по шару при отпускании мыши
+    function mouseReleased() {
+      if (isAiming) {
+        let force = createVector(cueBall.x - mouseX, cueBall.y - mouseY);
+        force.setMag(cuePower); // Применяем силу удара
+        cueBall.applyForce(force);
+        isAiming = false;
+        p.innerHTML = "Мощность кия "+cuePower.toFixed(1);
+        document.body.appendChild(p);
+      }
+    }
+
+    // Класс шара
+    class Ball {
+      constructor(x, y, r, color, isCueBall = false) {
+        this.x = x;
+        this.y = y;
+        this.r = r;
+        this.color = color;
+        this.isCueBall = isCueBall;
+        this.vx = 0;
+        this.vy = 0;
+        this.stopped = false;
+      }
+
+      // Обновление движения
+      update() {
+        this.x += this.vx;
+        this.y += this.vy;
+
+        // Применение трения
+        this.vx *= friction;
+        this.vy *= friction;
+
+        // Проверка столкновения с бортами
+        if (this.x - this.r < 23 || this.x + this.r > width - 23) {
+          this.vx *= -1;
+          this.x = constrain(this.x, 23 + this.r, width - 23 - this.r);
+        }
+        if (this.y - this.r < 23 || this.y + this.r > height - 23) {
+          this.vy *= -1;
+          this.y = constrain(this.y, 23 + this.r, height - 23 - this.r);
+        }
+
+        // Остановка шара
+        if (abs(this.vx) < 0.01 && abs(this.vy) < 0.01) {
+          this.vx = 0;
+          this.vy = 0;
+          this.stopped = true;
+        }
+      }
+
+      // Отображение шара
+      display() {
+        fill(this.color);
+        noStroke();
+        ellipse(this.x, this.y, this.r * 2);
+      }
+
+      // Применение силы к шару
+      applyForce(force) {
+        this.vx += force.x;
+        this.vy += force.y;
+      }
+
+      // Проверка наведения мыши на шар
+      isMouseOver() {
+        return dist(mouseX, mouseY, this.x, this.y) < this.r;
+      }
+
+      // Сброс позиции шара
+      resetPosition() {
+        this.x = cueBallStartPosition.x;
+        this.y = cueBallStartPosition.y;
+        this.vx = 0;
+        this.vy = 0;
+      }
+    }
+
+    // Класс кия
+    class Cue {
+      display(cueBall) {
+        stroke(255);
+        strokeWeight(4);
+        line(cueBall.x, cueBall.y, mouseX, mouseY);
+      }
+    }
+
+    // Обработка столкновений между шарами
+    function handleCollisions() {
+      for (let i = 0; i < balls.length; i++) {
+        for (let j = i + 1; j < balls.length; j++) {
+          let ball1 = balls[i];
+          let ball2 = balls[j];
+          let d = dist(ball1.x, ball1.y, ball2.x, ball2.y);
+
+          // Проверяем столкновение
+          if (d < ball1.r + ball2.r) {
+            let angle = atan2(ball2.y - ball1.y, ball2.x - ball1.x);
+            let overlap = ball1.r + ball2.r - d;
+
+            // Раздвигаем шары, чтобы устранить пересечение
+            ball1.x -= cos(angle) * overlap / 2;
+            ball1.y -= sin(angle) * overlap / 2;
+            ball2.x += cos(angle) * overlap / 2;
+            ball2.y += sin(angle) * overlap / 2;
+
+            // Рассчитываем обмен скоростями
+            let vx1 = ball1.vx * cos(angle) + ball1.vy * sin(angle);
+            let vy1 = ball1.vy * cos(angle) - ball1.vx * sin(angle);
+            let vx2 = ball2.vx * cos(angle) + ball2.vy * sin(angle);
+            let vy2 = ball2.vy * cos(angle) - ball2.vx * sin(angle);
+
+            let temp = vx1;
+            vx1 = vx2;
+            vx2 = temp;
+
+            // Возвращаем новые скорости
+            ball1.vx = vx1 * cos(angle) - vy1 * sin(angle);
+            ball1.vy = vy1 * cos(angle) + vx1 * sin(angle);
+            ball2.vx = vx2 * cos(angle) - vy2 * sin(angle);
+            ball2.vy = vy2 * cos(angle) + vx2 * sin(angle);
+          }
+        }
+      }
+    }
+
+    
+  </script>
+  <button onclick="window.location.reload()">Restart</button>
+</body>
+</html>
