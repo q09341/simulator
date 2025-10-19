@@ -17,7 +17,7 @@
 2. Откройте терминал (на Windows — командная строка).
 3. Выполните эту команду:
 git clone https://github.com/q09341/simulator.git
-4. Откройте в браузере ссылку ниже.
+4. Откройте в браузере ссылку:
 [точнопоследняяверсия.html](https://github.com/user-attachments/files/22989876/default.html)
 
 
